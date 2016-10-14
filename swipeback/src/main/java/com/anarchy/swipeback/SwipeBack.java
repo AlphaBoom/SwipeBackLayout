@@ -2,6 +2,7 @@ package com.anarchy.swipeback;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
@@ -14,6 +15,7 @@ import android.support.v4.widget.ViewDragHelper;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
@@ -28,9 +30,7 @@ import java.lang.annotation.RetentionPolicy;
  * Date: 16/10/12 11:08
  * Author: zhendong.wu@shoufuyou.com
  * <p/>
- * Copyright © 2016 Shanghai Xiaotu Network Technology Co., Ltd.
  */
-
 public class SwipeBack extends FrameLayout {
     /*拖动模式*/
     /**
@@ -68,9 +68,10 @@ public class SwipeBack extends FrameLayout {
 
     private static final String TAG = SwipeBack.class.getSimpleName();
     private static final boolean DEBUG = true;
-    private static final int START_SHADOW_COLOR = 0x3D000000;
-    private static final int END_SHADOW_COLOR = 0x10000000;
+    private static final int START_SHADOW_COLOR = 0x88000000;
+    private static final int END_SHADOW_COLOR = 0;
     private static final int DEFAULT_BACKGROUND_COLOR = 0xFFF1F2F3;
+    private static final int MIN_VELOCITY_FACTOR = 70;
     private static final float DEFAULT_THRESHOLD = 0.4f;
     private static final int INVALID_POINTER = -1;
 
@@ -83,6 +84,7 @@ public class SwipeBack extends FrameLayout {
     private float mRatio = 0f;
     private int mEndShadowColor = END_SHADOW_COLOR;
     private int mStartShadowColor = START_SHADOW_COLOR;
+    private boolean mDisableFlingGesture;
 
 
     private int mRecordPointerId;
@@ -95,6 +97,7 @@ public class SwipeBack extends FrameLayout {
         super(activity);
         mActivity = activity;
         mViewDragHelper = ViewDragHelper.create(this, sensitivity, new ViewDragCallBack());
+        mViewDragHelper.setMinVelocity(ViewConfiguration.get(getContext()).getScaledMinimumFlingVelocity()*MIN_VELOCITY_FACTOR);
         mViewDragHelper.setEdgeTrackingEnabled(ViewDragHelper.EDGE_LEFT);
     }
 
@@ -179,6 +182,10 @@ public class SwipeBack extends FrameLayout {
         return true;
     }
 
+    @Override
+    protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+        return super.drawChild(canvas, child, drawingTime);
+    }
 
     @Override
     public void computeScroll() {
@@ -231,8 +238,8 @@ public class SwipeBack extends FrameLayout {
         if ((mDirection & DIRECTION_BOTTOM) == DIRECTION_BOTTOM && mActivity != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
                     && (mActivity.getWindow().getAttributes().flags & WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS) == 0) {
-                int id = mActivity.getResources().getIdentifier("status_bar_height","dimen","android");
-                if(id > 0){
+                int id = mActivity.getResources().getIdentifier("status_bar_height", "dimen", "android");
+                if (id > 0) {
                     final int statusBarHeight = mActivity.getResources().getDimensionPixelSize(id);
                     getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
                         @SuppressLint("NewApi")
@@ -240,13 +247,13 @@ public class SwipeBack extends FrameLayout {
                         public boolean onPreDraw() {
                             getViewTreeObserver().removeOnPreDrawListener(this);
                             View child = getChildAt(0);
-                            Rect rect = new Rect(0,statusBarHeight,child.getWidth(),child.getHeight());
+                            Rect rect = new Rect(0, statusBarHeight, child.getWidth(), child.getHeight());
                             child.setClipBounds(rect);
                             return false;
                         }
                     });
                     View child = getChildAt(0);
-                    Rect clipBounds = new Rect(0,statusBarHeight,child.getWidth(),child.getHeight());
+                    Rect clipBounds = new Rect(0, statusBarHeight, child.getWidth(), child.getHeight());
                     child.setClipBounds(clipBounds);
                 }
 
@@ -261,6 +268,14 @@ public class SwipeBack extends FrameLayout {
 
     public void setStartShadowColor(int startShadowColor) {
         mStartShadowColor = startShadowColor;
+    }
+
+    public void setMinFlingVelocity(float minFlingVelocity) {
+        mViewDragHelper.setMinVelocity(minFlingVelocity);
+    }
+
+    public void disableFlingGesture(boolean disable) {
+        mDisableFlingGesture = disable;
     }
 
 
@@ -325,7 +340,8 @@ public class SwipeBack extends FrameLayout {
         public void onViewReleased(View releasedChild, float xvel, float yvel) {
             int finalLeft = getFinalLeft(releasedChild, xvel);
             int finalTop = getFinalTop(releasedChild, yvel);
-            log("final point  (finalLeft:" + finalLeft + ",finalTop:" + finalTop + ")");
+            log("final point  (finalLeft:" + finalLeft + ",finalTop:" + finalTop +
+                    ",xvle:" + xvel + ",yvel:" + yvel + ",minvel:" + mViewDragHelper.getMinVelocity() + ")");
             mViewDragHelper.settleCapturedViewAt(finalLeft, finalTop);
             ViewCompat.postInvalidateOnAnimation(SwipeBack.this);
         }
@@ -345,7 +361,6 @@ public class SwipeBack extends FrameLayout {
                 ratioVertical = -top / (float) getHeight();
             }
             mRatio = Math.max(ratioHorizontal, ratioVertical);
-            log("ratio:" + mRatio);
             if (mRatio == 0) {
                 setBackgroundColor(0);
             }
@@ -374,11 +389,13 @@ public class SwipeBack extends FrameLayout {
     private int getFinalLeft(View releasedChild, float xvel) {
         boolean checkLeft = (mDirection & DIRECTION_LEFT) == DIRECTION_LEFT;
         boolean checkRight = (mDirection & DIRECTION_RIGHT) == DIRECTION_RIGHT;
-        if (xvel > 0 && checkLeft) {
-            return getWidth();
-        }
-        if (xvel < 0 && checkRight) {
-            return -getWidth();
+        if(!mDisableFlingGesture) {
+            if (xvel > 0 && checkLeft) {
+                return getWidth();
+            }
+            if (xvel < 0 && checkRight) {
+                return -getWidth();
+            }
         }
         if (checkLeft && releasedChild.getLeft() > 0 && releasedChild.getLeft() < getWidth() * mThreshold) {
             return 0;
@@ -398,11 +415,13 @@ public class SwipeBack extends FrameLayout {
     private int getFinalTop(View releasedChild, float yvel) {
         boolean checkTop = (mDirection & DIRECTION_TOP) == DIRECTION_TOP;
         boolean checkBottom = (mDirection & DIRECTION_BOTTOM) == DIRECTION_BOTTOM;
-        if (yvel > 0 && checkBottom) {
-            return getHeight();
-        }
-        if (yvel < 0 && checkTop) {
-            return -getHeight();
+        if(!mDisableFlingGesture) {
+            if (yvel > 0 && checkBottom) {
+                return getHeight();
+            }
+            if (yvel < 0 && checkTop) {
+                return -getHeight();
+            }
         }
         if (checkTop && releasedChild.getTop() > 0 && releasedChild.getTop() < getHeight() * mThreshold) {
             return 0;
