@@ -13,8 +13,8 @@ protected void onCreate(@Nullable Bundle savedInstanceState) {
 * set support drag region 
 ```java
 @IntDef(value = {DRAG_NONE, DRAG_FULL, EDGE_LEFT, EDGE_RIGHT, EDGE_TOP, EDGE_BOTTOM, EDGE_ALL}, flag = true)
-    @Retention(RetentionPolicy.SOURCE)
-    @interface DragMode {
+@Retention(RetentionPolicy.SOURCE)
+@interface DragMode {
 
     }
 swipeBack.setDragMode(SwipeBack.EDGE_LEFT);
@@ -22,8 +22,8 @@ swipeBack.setDragMode(SwipeBack.EDGE_LEFT);
 * set support drag direction
 ```java
 @IntDef(value = {DIRECTION_LEFT, DIRECTION_RIGHT, DIRECTION_TOP, DIRECTION_BOTTOM}, flag = true)
-    @Retention(RetentionPolicy.SOURCE)
-    @interface Direction {
+@Retention(RetentionPolicy.SOURCE)
+@interface Direction {
 
     }
 swipeBack.setDirection(SwipeBack.DIRECTION_LEFT);
