@@ -1,5 +1,5 @@
 # SwipeBackLayout
-##HOW TO USE
+## HOW TO USE
 copy the source code and attach android activity
 ```java
 @Override
@@ -9,7 +9,7 @@ protected void onCreate(@Nullable Bundle savedInstanceState) {
         SwipeBack swipeBack = SwipeBack.attachActivity(this);
     }
 ```
-##CONFIG
+## CONFIG
 * set support drag region 
 ```java
 @IntDef(value = {DRAG_NONE, DRAG_FULL, EDGE_LEFT, EDGE_RIGHT, EDGE_TOP, EDGE_BOTTOM, EDGE_ALL}, flag = true)

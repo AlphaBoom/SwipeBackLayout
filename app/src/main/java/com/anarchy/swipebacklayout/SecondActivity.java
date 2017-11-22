@@ -20,7 +20,7 @@ public class SecondActivity  extends AppCompatActivity{
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_second);
         SwipeBack swipeBack = SwipeBack.attachActivity(this);
-        swipeBack.setDragMode(SwipeBack.EDGE_LEFT|SwipeBack.EDGE_RIGHT);
-        swipeBack.setDirection(SwipeBack.DIRECTION_LEFT|SwipeBack.DIRECTION_RIGHT);
+        swipeBack.setDirection(SwipeBack.DIRECTION_LEFT);
+        swipeBack.setDragMode(SwipeBack.EDGE_LEFT);
     }
 }

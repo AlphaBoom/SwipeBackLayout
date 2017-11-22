@@ -1,11 +1,14 @@
 package com.anarchy.swipeback;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.ActivityOptions;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
@@ -23,12 +26,12 @@ import android.widget.FrameLayout;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Method;
 
 /**
- * Version 2.1.1
  * <p>
  * Date: 16/10/12 11:08
- * Author: zhendong.wu@shoufuyou.com
+ * Author: rsshinide38@163.com
  * <p/>
  */
 public class SwipeBack extends FrameLayout {
@@ -74,10 +77,11 @@ public class SwipeBack extends FrameLayout {
     private static final int MIN_VELOCITY_FACTOR = 70;
     private static final float DEFAULT_THRESHOLD = 0.4f;
     private static final int INVALID_POINTER = -1;
+    private static final int UNKNOWN_CHILD_POSITION = Integer.MIN_VALUE;
 
 
-    private final Activity mActivity;
-    private final ViewDragHelper mViewDragHelper;
+    private Activity mActivity;
+    private ViewDragHelper mViewDragHelper;
     private int mDragMode = EDGE_LEFT;
     private int mDirection = DIRECTION_LEFT;
     private float mThreshold = DEFAULT_THRESHOLD;
@@ -93,11 +97,14 @@ public class SwipeBack extends FrameLayout {
     private float mCheckedX;
     private float mCheckedY;
 
+    private int mChildLastLeft = UNKNOWN_CHILD_POSITION;
+    private int mChildLastTop = UNKNOWN_CHILD_POSITION;
+
     private SwipeBack(Activity activity, float sensitivity) {
         super(activity);
         mActivity = activity;
         mViewDragHelper = ViewDragHelper.create(this, sensitivity, new ViewDragCallBack());
-        mViewDragHelper.setMinVelocity(ViewConfiguration.get(getContext()).getScaledMinimumFlingVelocity()*MIN_VELOCITY_FACTOR);
+        mViewDragHelper.setMinVelocity(ViewConfiguration.get(getContext()).getScaledMinimumFlingVelocity() * MIN_VELOCITY_FACTOR);
         mViewDragHelper.setEdgeTrackingEnabled(ViewDragHelper.EDGE_LEFT);
     }
 
@@ -134,11 +141,15 @@ public class SwipeBack extends FrameLayout {
         if (force) {
             child.setBackgroundColor(backgroundColor);
         } else if (child.getBackground() == null
-                && child.getBackground() instanceof ColorDrawable
-                && ((ColorDrawable) child.getBackground()).getColor() == 0) {
-            child.setBackgroundColor(backgroundColor);
-        } else {
-            child.setBackgroundDrawable(activity.getWindow().getDecorView().getBackground());
+                || (child.getBackground() instanceof ColorDrawable
+                && ((ColorDrawable) child.getBackground()).getColor() == 0)) {
+            Drawable windowBackground = activity.getWindow().getDecorView().getBackground();
+            if (windowBackground != null &&
+                    !((windowBackground instanceof ColorDrawable) && ((ColorDrawable) windowBackground).getColor() == 0)) {
+                child.setBackgroundDrawable(activity.getWindow().getDecorView().getBackground());
+            } else {
+                child.setBackgroundColor(backgroundColor);
+            }
         }
         activity.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         decorView.removeAllViews();
@@ -147,6 +158,18 @@ public class SwipeBack extends FrameLayout {
         return swipeBack;
     }
 
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        if((mChildLastLeft != UNKNOWN_CHILD_POSITION || mChildLastTop != UNKNOWN_CHILD_POSITION )&& getChildCount() > 1){
+            View child = getChildAt(0);
+            int width = child.getMeasuredWidth();
+            int height = child.getMeasuredHeight();
+            int childLeft = mChildLastLeft == UNKNOWN_CHILD_POSITION ? 0 : mChildLastLeft;
+            int childTop = mChildLastTop == UNKNOWN_CHILD_POSITION ? 0 : mChildLastTop;
+            child.layout(childLeft,childTop,childLeft + width,childTop + height);
+        }
+    }
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
@@ -155,12 +178,14 @@ public class SwipeBack extends FrameLayout {
             case MotionEvent.ACTION_DOWN:
                 int index = ev.getActionIndex();
                 mRecordPointerId = ev.getPointerId(index);
+                if(mRecordPointerId == -1) break;
                 mInitialX = ev.getX(index);
                 mInitialY = ev.getY(index);
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (mRecordPointerId == INVALID_POINTER) break;
                 int indexMove = ev.findPointerIndex(mRecordPointerId);
+                if(indexMove == -1) break;
                 mCheckedX = ev.getX(indexMove);
                 mCheckedY = ev.getY(indexMove);
                 break;
@@ -180,6 +205,11 @@ public class SwipeBack extends FrameLayout {
         if (mDragMode == DRAG_NONE) return false;
         mViewDragHelper.processTouchEvent(event);
         return true;
+    }
+
+    @Override
+    public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
+        //nope
     }
 
     @Override
@@ -295,7 +325,7 @@ public class SwipeBack extends FrameLayout {
         return false;
     }
 
-    class ViewDragCallBack extends ViewDragHelper.Callback {
+    private class ViewDragCallBack extends ViewDragHelper.Callback {
 
         @Override
         public boolean tryCaptureView(View child, int pointerId) {
@@ -316,6 +346,13 @@ public class SwipeBack extends FrameLayout {
 
         @Override
         public int clampViewPositionHorizontal(View child, int left, int dx) {
+            if(mChildLastLeft != UNKNOWN_CHILD_POSITION){
+                int expectLeft = mChildLastLeft + dx;
+                if(expectLeft != left){
+                    left = expectLeft;
+                }
+            }
+            mChildLastLeft = left;
             int masked = mDirection & (DIRECTION_LEFT | DIRECTION_RIGHT);
             if (masked != 0) {
                 if (masked == (DIRECTION_LEFT | DIRECTION_RIGHT)) return left;
@@ -327,6 +364,13 @@ public class SwipeBack extends FrameLayout {
 
         @Override
         public int clampViewPositionVertical(View child, int top, int dy) {
+            if(mChildLastTop != UNKNOWN_CHILD_POSITION){
+                int expectTop = mChildLastTop + dy;
+                if(expectTop != top){
+                    top = expectTop;
+                }
+            }
+            mChildLastTop = top;
             int masked = mDirection & (DIRECTION_TOP | DIRECTION_BOTTOM);
             if (masked != 0) {
                 if (masked == (DIRECTION_TOP | DIRECTION_BOTTOM)) return top;
@@ -371,25 +415,42 @@ public class SwipeBack extends FrameLayout {
                 mActivity.getWindow().setWindowAnimations(0);
                 mActivity.finish();
                 mActivity.overridePendingTransition(0, 0);
+                mActivity = null;
             }
 
         }
 
         @Override
-        public void onViewDragStateChanged(int state) {
+        public int getViewHorizontalDragRange(View child) {
+            return getWidth();
+        }
 
+        @Override
+        public int getViewVerticalDragRange(View child) {
+            return getHeight();
+        }
+
+        @Override
+        public void onViewDragStateChanged(int state) {
+            if(state == ViewDragHelper.STATE_DRAGGING){
+                changeActivityToTranslucent(true);
+            }
+            if(state == ViewDragHelper.STATE_IDLE){
+                changeActivityToTranslucent(false);
+            }
         }
 
         @Override
         public void onViewCaptured(View capturedChild, int activePointerId) {
-
+                mChildLastLeft = UNKNOWN_CHILD_POSITION;
+                mChildLastTop = UNKNOWN_CHILD_POSITION;
         }
     }
 
     private int getFinalLeft(View releasedChild, float xvel) {
         boolean checkLeft = (mDirection & DIRECTION_LEFT) == DIRECTION_LEFT;
         boolean checkRight = (mDirection & DIRECTION_RIGHT) == DIRECTION_RIGHT;
-        if(!mDisableFlingGesture) {
+        if (!mDisableFlingGesture) {
             if (xvel > 0 && checkLeft) {
                 return getWidth();
             }
@@ -415,7 +476,7 @@ public class SwipeBack extends FrameLayout {
     private int getFinalTop(View releasedChild, float yvel) {
         boolean checkTop = (mDirection & DIRECTION_TOP) == DIRECTION_TOP;
         boolean checkBottom = (mDirection & DIRECTION_BOTTOM) == DIRECTION_BOTTOM;
-        if(!mDisableFlingGesture) {
+        if (!mDisableFlingGesture) {
             if (yvel > 0 && checkBottom) {
                 return getHeight();
             }
@@ -439,9 +500,108 @@ public class SwipeBack extends FrameLayout {
     }
 
 
+    private void changeActivityToTranslucent(boolean isTranslucent){
+        if(mActivity == null) return;
+        if(isTranslucent){
+            convertActivityToTranslucent(mActivity);
+        }else {
+            convertActivityFromTranslucent(mActivity);
+        }
+    }
+
+
+
+    /**
+     * Convert a translucent themed Activity
+     * {@link android.R.attr#windowIsTranslucent} to a fullscreen opaque
+     * Activity.
+     * <p>
+     * Call this whenever the background of a translucent Activity has changed
+     * to become opaque. Doing so will allow the {@link android.view.Surface} of
+     * the Activity behind to be released.
+     * <p>
+     * This call has no effect on non-translucent activities or on activities
+     * with the {@link android.R.attr#windowIsFloating} attribute.
+     */
+    private static void convertActivityFromTranslucent(Activity activity) {
+        try {
+            Method method = Activity.class.getDeclaredMethod("convertFromTranslucent");
+            method.setAccessible(true);
+            method.invoke(activity);
+        } catch (Throwable t) {
+        }
+    }
+
+    /**
+     * Convert a translucent themed Activity
+     * {@link android.R.attr#windowIsTranslucent} back from opaque to
+     * translucent following a call to
+     * {@link #convertActivityFromTranslucent(android.app.Activity)} .
+     * <p>
+     * Calling this allows the Activity behind this one to be seen again. Once
+     * all such Activities have been redrawn
+     * <p>
+     * This call has no effect on non-translucent activities or on activities
+     * with the {@link android.R.attr#windowIsFloating} attribute.
+     */
+    private static void convertActivityToTranslucent(Activity activity) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            convertActivityToTranslucentAfterL(activity);
+        } else {
+            convertActivityToTranslucentBeforeL(activity);
+        }
+    }
+
+    /**
+     * Calling the convertToTranslucent method on platforms before Android 5.0
+     */
+    private static void convertActivityToTranslucentBeforeL(Activity activity) {
+        try {
+            Class<?>[] classes = Activity.class.getDeclaredClasses();
+            Class<?> translucentConversionListenerClazz = null;
+            for (Class clazz : classes) {
+                if (clazz.getSimpleName().contains("TranslucentConversionListener")) {
+                    translucentConversionListenerClazz = clazz;
+                }
+            }
+            Method method = Activity.class.getDeclaredMethod("convertToTranslucent",
+                    translucentConversionListenerClazz);
+            method.setAccessible(true);
+            method.invoke(activity, new Object[] {
+                    null
+            });
+        } catch (Throwable t) {
+        }
+    }
+
+    /**
+     * Calling the convertToTranslucent method on platforms after Android 5.0
+     */
+    @TargetApi(21)
+    private static void convertActivityToTranslucentAfterL(Activity activity) {
+        try {
+            Method getActivityOptions = Activity.class.getDeclaredMethod("getActivityOptions");
+            getActivityOptions.setAccessible(true);
+            Object options = getActivityOptions.invoke(activity);
+
+            Class<?>[] classes = Activity.class.getDeclaredClasses();
+            Class<?> translucentConversionListenerClazz = null;
+            for (Class clazz : classes) {
+                if (clazz.getSimpleName().contains("TranslucentConversionListener")) {
+                    translucentConversionListenerClazz = clazz;
+                }
+            }
+            Method convertToTranslucent = Activity.class.getDeclaredMethod("convertToTranslucent",
+                    translucentConversionListenerClazz, ActivityOptions.class);
+            convertToTranslucent.setAccessible(true);
+            convertToTranslucent.invoke(activity, null, options);
+        } catch (Throwable t) {
+        }
+    }
+
+
     private void log(String message) {
         if (DEBUG)
             Log.w(TAG, message);
     }
-
 }

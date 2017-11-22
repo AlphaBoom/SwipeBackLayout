@@ -7,17 +7,5 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
-        <item name="android:windowAnimationStyle">@style/Slide</item>
-        <item name="android:windowIsTranslucent">true</item>
-
-    </style>
-
-    <style name="Slide">
-        <item name="android:windowEnterAnimation">@anim/right_slide_in</item>
-        <item name="android:windowExitAnimation">@anim/right_slide_out</item>
-        <item name="android:activityOpenEnterAnimation">@anim/right_slide_in</item>
-        <item name="android:activityCloseExitAnimation">@anim/right_slide_out</item>
-        <!--<item name="android:activityOpenExitAnimation">@anim/alpha</item>-->
-        <!--<item name="android:activityCloseEnterAnimation">@anim/alpha</item>-->
     </style>
 </resources>
