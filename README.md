@@ -9,6 +9,24 @@ protected void onCreate(@Nullable Bundle savedInstanceState) {
         SwipeBack swipeBack = SwipeBack.attachActivity(this);
     }
 ```
+or
+add dependencies from jitpack
+* Step 1. Add the JitPack repository to your build file
+Add it in your root build.gradle at the end of repositories:
+```java
+        allprojects {
+		repositories {
+			...
+			maven { url 'https://www.jitpack.io' }
+		}
+	}
+```
+* Step 2. Add the dependency
+```java
+        dependencies {
+	        compile 'com.github.AlphaBoom:SwipeBackLayout:-SNAPSHOT'
+	}
+```
 ## CONFIG
 * set support drag region 
 ```java
