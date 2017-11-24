@@ -388,6 +388,8 @@ public class SwipeBack extends FrameLayout {
                     ",xvle:" + xvel + ",yvel:" + yvel + ",minvel:" + mViewDragHelper.getMinVelocity() + ")");
             mViewDragHelper.settleCapturedViewAt(finalLeft, finalTop);
             ViewCompat.postInvalidateOnAnimation(SwipeBack.this);
+            mChildLastLeft = UNKNOWN_CHILD_POSITION;
+            mChildLastTop = UNKNOWN_CHILD_POSITION;
         }
 
         @Override
