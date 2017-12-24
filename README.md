@@ -46,4 +46,4 @@ swipeBack.setDragMode(SwipeBack.EDGE_LEFT);
     }
 swipeBack.setDirection(SwipeBack.DIRECTION_LEFT);
 ```
-
+@@
